@@ -6,11 +6,12 @@
 <title>Dashboard de Vendas — Ótica Cristal Santa Rosa</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
 :root{
   --bg:#F2F4F8;--surface:#FFFFFF;--surface2:#F7F9FC;--surface3:#EDF0F5;
   --border:rgba(0,0,0,.12);--border2:rgba(0,0,0,.07);
-  --accent:#C9A84C;--green:#1A9E5C;--red:#D93A3A;--blue-lt:#2A7DC9;
+  --accent:#C9A84C;--green:#1A9E5C;--red:#D93A3A;--blue-lt:#2A7DC9;--purple:#7C5CD9;--teal:#1FA39A;
   --text:#0F1F35;--text2:#3A5070;--text3:#6B89A8;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -28,26 +29,34 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
 }
 .btn{background:var(--blue-lt);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;transition:opacity .15s;}
 .btn:hover{opacity:.88;}
-.btn-ghost{background:transparent;border:1.5px solid var(--border);color:var(--text2);}
 
-.container{max-width:1280px;margin:0 auto;padding:28px;}
+.container{max-width:1320px;margin:0 auto;padding:28px;}
 
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;margin-bottom:28px;}
-.kpi-card{background:#fff;border:1px solid var(--border2);border-radius:14px;padding:22px 24px;}
-.kpi-label{font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;}
-.kpi-val{font-size:32px;font-weight:800;letter-spacing:-.5px;}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:18px;margin-bottom:24px;}
+.kpi-card{background:#fff;border:1px solid var(--border2);border-radius:14px;padding:20px 22px;}
+.kpi-label{font-size:11.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;}
+.kpi-val{font-size:28px;font-weight:800;letter-spacing:-.5px;}
 
 .section{background:#fff;border:1px solid var(--border2);border-radius:14px;padding:24px;margin-bottom:24px;}
 .section-title{font-size:16px;font-weight:800;margin-bottom:18px;display:flex;align-items:center;gap:8px;}
 .section-title .bar{width:4px;height:18px;background:var(--accent);border-radius:2px;}
 
+.grid-2{display:grid;grid-template-columns:1.3fr 1fr;gap:24px;}
+.grid-2 .section{margin-bottom:0;}
+@media(max-width:900px){.grid-2{grid-template-columns:1fr;}}
+
 table{width:100%;border-collapse:collapse;}
-th{text-align:left;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;padding:8px 12px;border-bottom:2px solid var(--border2);}
+th{text-align:left;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;padding:8px 10px;border-bottom:2px solid var(--border2);}
 th.num,td.num{text-align:right;}
-td{padding:12px;border-bottom:1px solid var(--border2);font-size:14px;}
+td{padding:11px 10px;border-bottom:1px solid var(--border2);font-size:13.5px;}
 tr:last-child td{border-bottom:none;}
 tr:hover td{background:var(--surface2);}
-.rank{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--surface3);font-size:11px;font-weight:800;color:var(--text2);margin-right:8px;}
+.rank{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--surface3);font-size:10.5px;font-weight:800;color:var(--text2);margin-right:8px;}
+.mix-bar{display:inline-block;height:6px;border-radius:3px;background:var(--blue-lt);vertical-align:middle;margin-left:8px;}
+.pct{color:var(--text3);font-size:12px;font-weight:600;}
+
+.chart-wrap{position:relative;height:280px;}
+.chart-wrap.small{height:240px;}
 
 #status{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:600;z-index:999;display:none;box-shadow:0 8px 24px rgba(0,0,0,.2);max-width:90vw;text-align:center;}
 #status.show{display:block;}
@@ -84,27 +93,48 @@ tr:hover td{background:var(--surface2);}
 
   <div class="kpis">
     <div class="kpi-card">
-      <div class="kpi-label">Quantidade Vendida</div>
+      <div class="kpi-label">Valor Vendido</div>
+      <div class="kpi-val" id="kpi-valor">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Nº de Vendas</div>
+      <div class="kpi-val" id="kpi-nvendas">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Quantidade de Itens</div>
       <div class="kpi-val" id="kpi-qty">—</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Ticket Médio</div>
       <div class="kpi-val" id="kpi-ticket">—</div>
     </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Valor Vendido</div>
-      <div class="kpi-val" id="kpi-valor">—</div>
-    </div>
   </div>
 
   <div class="section">
-    <div class="section-title"><span class="bar"></span>Por Consultor</div>
-    <div id="tabela-consultor"></div>
+    <div class="section-title"><span class="bar"></span>Evolução de Vendas no Período</div>
+    <div class="chart-wrap"><canvas id="chart-evolucao"></canvas></div>
+  </div>
+
+  <div class="grid-2" style="margin-bottom:24px;">
+    <div class="section">
+      <div class="section-title"><span class="bar"></span>Por Consultor</div>
+      <div class="chart-wrap small"><canvas id="chart-consultor"></canvas></div>
+      <div id="tabela-consultor" style="margin-top:18px;"></div>
+    </div>
+    <div class="section">
+      <div class="section-title"><span class="bar"></span>Mix por Tipo de Produto</div>
+      <div class="chart-wrap small"><canvas id="chart-tipo"></canvas></div>
+    </div>
   </div>
 
   <div class="section">
     <div class="section-title"><span class="bar"></span>Por Tipo de Produto</div>
     <div id="tabela-tipo"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><span class="bar"></span>Top Marcas</div>
+    <div id="tabela-marca"></div>
   </div>
 
 </div>
@@ -115,8 +145,55 @@ tr:hover td{background:var(--surface2);}
 const API_CNPJ = '07542559000192';
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
+// De-para: código do tipo de produto (como vem da API) -> nome de exibição
+// Baseado na nomenclatura usada na base histórica da loja (coluna "Tipos")
+const TIPOS_NOMES = {
+  'RX': 'Receituário',
+  'VS': 'Visão Simples',
+  'DIV': 'Diversos',
+  'MULT': 'Multifocal',
+  'SOLAR': 'Solar',
+  'TRAT': 'Tratamento',
+  'LC': 'Lente de Contato',
+  'CONS': 'Conserto',
+  'ASSIS': 'Assistência Técnica',
+  'OCUPA': 'Ocupacional',
+  'MONT': 'Montagem/Armação',
+  'BIF': 'Bifocal',
+  'MULT DOBRO': 'Multifocal (Dobro)',
+  'VS DOBRO': 'Visão Simples (Dobro)',
+  'REL': 'Relógio',
+  'DOBRO': 'Dobro',
+  'CORREIOS': 'Correios/Envio',
+  'PROMO': 'Promoção',
+  'SERV': 'Serviço',
+  'RX PROMO': 'Receituário Promoção',
+  'VS PROMO': 'Visão Simples Promoção',
+  'OCUPA DOBRO': 'Ocupacional (Dobro)',
+  'TRAT GRATIS': 'Tratamento Grátis',
+  'LICITAÇÃO': 'Licitação'
+};
+
+function nomeTipo(codigo){
+  const chave = chaveNormalizada(codigo);
+  return TIPOS_NOMES[chave] || tituloCase(codigo || 'Outros');
+}
+
+const CHART_COLORS = ['#2A7DC9','#C9A84C','#1A9E5C','#7C5CD9','#D93A3A','#1FA39A','#E08A3C','#5B7DB1','#B45CC9','#3A8F6B'];
+
+let charts = {};
+
 function fmtMoney(v){ return 'R$ '+(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function fmtInt(v){ return (v||0).toLocaleString('pt-BR'); }
+
+// Normaliza nomenclatura: remove acentos p/ comparação, capitaliza bonito p/ exibição
+function tituloCase(str){
+  return String(str||'').toLowerCase().trim()
+    .replace(/(^|\s)([a-zà-ú])/g, (m,p1,p2) => p1+p2.toUpperCase());
+}
+function chaveNormalizada(str){
+  return String(str||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
+}
 
 function showStatus(msg, isError, ms){
   const el = document.getElementById('status');
@@ -141,7 +218,6 @@ function showLoading(show){
   }
 }
 
-// Popula select de meses (últimos 24 meses)
 function initMesSelect(){
   const sel = document.getElementById('sel-mes');
   const now = new Date();
@@ -178,7 +254,6 @@ function getPeriodo(){
   }
 }
 
-// Divide um período em blocos de até 30 dias (limite da API)
 function splitInto30DayChunks(start, end){
   const chunks = [];
   let cur = new Date(start+'T00:00:00');
@@ -207,20 +282,31 @@ async function fetchVendas(start, end){
   return results.flat();
 }
 
+// Processa vendas: limpa nomenclaturas e exclui tipos irrelevantes
 function processarVendas(vendas){
   const rows = [];
+  let nVendas = 0;
   for(const venda of vendas){
     if(venda.status !== 'ATIVA') continue;
-    const consultor = (venda.funcionario?.nome || 'Sem consultor').trim();
-    for(const item of (venda.itens || [])){
+    const itens = venda.itens || [];
+    if(!itens.length) continue;
+    nVendas++;
+    const consultor = tituloCase(venda.funcionario?.nome || 'Sem Consultor');
+    const data = venda.data;
+    for(const item of itens){
       const qty = +item.quantidade || 0;
       const val = +item.valor_total_liquido || 0;
-      const tipo = (item.produto?.grupo || 'Outros').trim();
       if(qty===0 && val===0) continue;
-      rows.push({consultor, tipo, qty, val});
+      rows.push({
+        consultor,
+        tipo: nomeTipo(item.produto?.grupo),
+        marca: tituloCase(item.produto?.grife || 'Sem Marca'),
+        data,
+        qty, val
+      });
     }
   }
-  return rows;
+  return {rows, nVendas};
 }
 
 function agregarPor(rows, chave){
@@ -236,7 +322,19 @@ function agregarPor(rows, chave){
     .sort((a,b) => b.val - a.val);
 }
 
-function renderTabela(containerId, dados, labelCol){
+function agregarPorData(rows){
+  const map = {};
+  for(const r of rows){
+    if(!map[r.data]) map[r.data] = {qty:0, val:0};
+    map[r.data].qty += r.qty;
+    map[r.data].val += r.val;
+  }
+  return Object.entries(map)
+    .map(([data,d]) => ({data, ...d}))
+    .sort((a,b) => a.data.localeCompare(b.data));
+}
+
+function renderTabela(containerId, dados, labelCol, totalVal){
   const el = document.getElementById(containerId);
   if(!dados.length){
     el.innerHTML = '<div class="empty">Nenhum dado encontrado para o período selecionado.</div>';
@@ -249,6 +347,7 @@ function renderTabela(containerId, dados, labelCol){
         <th class="num">Quantidade</th>
         <th class="num">Ticket Médio</th>
         <th class="num">Valor Vendido</th>
+        ${totalVal ? '<th class="num">% Mix</th>' : ''}
       </tr></thead>
       <tbody>
         ${dados.map((d,i) => `
@@ -257,11 +356,106 @@ function renderTabela(containerId, dados, labelCol){
             <td class="num">${fmtInt(d.qty)}</td>
             <td class="num">${fmtMoney(d.ticket)}</td>
             <td class="num">${fmtMoney(d.val)}</td>
+            ${totalVal ? `<td class="num pct">${((d.val/totalVal)*100).toFixed(1)}%</td>` : ''}
           </tr>
         `).join('')}
       </tbody>
     </table>
   `;
+}
+
+function destruirChart(id){
+  if(charts[id]){ charts[id].destroy(); delete charts[id]; }
+}
+
+function renderChartEvolucao(porData){
+  destruirChart('evolucao');
+  const ctx = document.getElementById('chart-evolucao');
+  charts.evolucao = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: porData.map(d => new Date(d.data+'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})),
+      datasets: [{
+        label: 'Valor Vendido',
+        data: porData.map(d => d.val),
+        backgroundColor: '#2A7DC9',
+        borderRadius: 4,
+        maxBarThickness: 28
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display:false }, tooltip: { callbacks: { label: c => fmtMoney(c.parsed.y) } } },
+      scales: {
+        y: { ticks: { callback: v => 'R$ '+v.toLocaleString('pt-BR') }, grid: { color:'#EDF0F5' } },
+        x: { grid: { display:false } }
+      }
+    }
+  });
+}
+
+function renderChartConsultor(dados){
+  destruirChart('consultor');
+  const top = dados.slice(0, 8);
+  const ctx = document.getElementById('chart-consultor');
+  charts.consultor = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: top.map(d => d.nome),
+      datasets: [{
+        label: 'Valor Vendido',
+        data: top.map(d => d.val),
+        backgroundColor: CHART_COLORS[0],
+        borderRadius: 4,
+        maxBarThickness: 22
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display:false }, tooltip: { callbacks: { label: c => fmtMoney(c.parsed.x) } } },
+      scales: {
+        x: { ticks: { callback: v => 'R$ '+v.toLocaleString('pt-BR') }, grid: { color:'#EDF0F5' } },
+        y: { grid: { display:false } }
+      }
+    }
+  });
+}
+
+function renderChartTipo(dados){
+  destruirChart('tipo');
+  const top = dados.slice(0, 8);
+  const ctx = document.getElementById('chart-tipo');
+  charts.tipo = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: top.map(d => d.nome),
+      datasets: [{
+        data: top.map(d => d.val),
+        backgroundColor: CHART_COLORS,
+        borderWidth: 2,
+        borderColor: '#fff'
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position:'right', labels:{ boxWidth:12, font:{size:11} } },
+        tooltip: { callbacks: { label: c => `${c.label}: ${fmtMoney(c.parsed)}` } }
+      }
+    }
+  });
+}
+
+function limparTudo(){
+  document.getElementById('kpi-qty').textContent = '0';
+  document.getElementById('kpi-ticket').textContent = fmtMoney(0);
+  document.getElementById('kpi-valor').textContent = fmtMoney(0);
+  document.getElementById('kpi-nvendas').textContent = '0';
+  renderTabela('tabela-consultor', [], 'Consultor');
+  renderTabela('tabela-tipo', [], 'Tipo');
+  renderTabela('tabela-marca', [], 'Marca');
+  destruirChart('evolucao'); destruirChart('consultor'); destruirChart('tipo');
 }
 
 async function carregar(){
@@ -274,32 +468,39 @@ async function carregar(){
   showLoading(true);
   try{
     const vendas = await fetchVendas(periodo.start, periodo.end);
-    const rows = processarVendas(vendas);
+    const {rows, nVendas} = processarVendas(vendas);
 
     if(!rows.length){
       showLoading(false);
       showStatus('⚠️ Nenhuma venda encontrada nesse período.', true, 5000);
-      document.getElementById('kpi-qty').textContent = '0';
-      document.getElementById('kpi-ticket').textContent = fmtMoney(0);
-      document.getElementById('kpi-valor').textContent = fmtMoney(0);
-      renderTabela('tabela-consultor', [], 'Consultor');
-      renderTabela('tabela-tipo', [], 'Tipo');
+      limparTudo();
       return;
     }
 
     const totalQty = rows.reduce((s,r)=>s+r.qty, 0);
     const totalVal = rows.reduce((s,r)=>s+r.val, 0);
-    const ticketMedio = totalQty ? totalVal/totalQty : 0;
+    const ticketMedio = nVendas ? totalVal/nVendas : 0;
 
+    document.getElementById('kpi-valor').textContent = fmtMoney(totalVal);
+    document.getElementById('kpi-nvendas').textContent = fmtInt(nVendas);
     document.getElementById('kpi-qty').textContent = fmtInt(totalQty);
     document.getElementById('kpi-ticket').textContent = fmtMoney(ticketMedio);
-    document.getElementById('kpi-valor').textContent = fmtMoney(totalVal);
 
-    renderTabela('tabela-consultor', agregarPor(rows, 'consultor'), 'Consultor');
-    renderTabela('tabela-tipo', agregarPor(rows, 'tipo'), 'Tipo de Produto');
+    const porConsultor = agregarPor(rows, 'consultor');
+    const porTipo = agregarPor(rows, 'tipo');
+    const porMarca = agregarPor(rows, 'marca');
+    const porData = agregarPorData(rows);
+
+    renderTabela('tabela-consultor', porConsultor, 'Consultor');
+    renderTabela('tabela-tipo', porTipo, 'Tipo de Produto', totalVal);
+    renderTabela('tabela-marca', porMarca.slice(0,15), 'Marca');
+
+    renderChartEvolucao(porData);
+    renderChartConsultor(porConsultor);
+    renderChartTipo(porTipo);
 
     showLoading(false);
-    showStatus(`✅ ${rows.length.toLocaleString('pt-BR')} itens de venda carregados — ${periodo.start} a ${periodo.end}`, false, 5000);
+    showStatus(`✅ ${nVendas.toLocaleString('pt-BR')} vendas carregadas — ${periodo.start} a ${periodo.end}`, false, 5000);
   }catch(err){
     showLoading(false);
     console.error(err);
