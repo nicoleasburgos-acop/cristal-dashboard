@@ -1641,8 +1641,9 @@ if(dz){
 const load=v=>document.getElementById('loading').style.display=v?'flex':'none';
 
 // ── CONFIG DA LOJA ───────────────────────────────────────
-const API_CNPJ  = '07542559000192'; // CNPJ sem pontuação
-const API_LOJA  = 'Ótica Cristal';  // Nome da loja
+const API_CNPJ      = '07542559000192';       // CNPJ sem pontuação
+const API_LOJA      = 'Ótica Cristal Santa Rosa'; // Nome da loja
+const API_ANO_INICIO = 2020;                  // Primeiro ano a buscar
 
 // ── AUTO-LOAD VIA API SSOTICA ────────────────────────────
 async function loadFromAPI(){
@@ -1660,19 +1661,17 @@ async function loadFromAPI(){
     if(tk<=999)return'Luxo';return'Alto Luxo';
   }
 
-  // Monta períodos: ano passado + ano atual (mês a mês)
+  // Monta períodos: todos os meses desde API_ANO_INICIO até hoje
   const now=new Date();
   const curYear=now.getFullYear(), curMonth=now.getMonth();
   const periods=[];
-  for(let m=0;m<12;m++){
-    const ld=new Date(curYear-1,m+1,0).getDate();
-    periods.push({start:`${curYear-1}-${String(m+1).padStart(2,'0')}-01`,
-                  end:`${curYear-1}-${String(m+1).padStart(2,'0')}-${ld}`});
-  }
-  for(let m=0;m<=curMonth;m++){
-    const ld=new Date(curYear,m+1,0).getDate();
-    periods.push({start:`${curYear}-${String(m+1).padStart(2,'0')}-01`,
-                  end:`${curYear}-${String(m+1).padStart(2,'0')}-${ld}`});
+  for(let year=API_ANO_INICIO; year<=curYear; year++){
+    const lastMonth = year===curYear ? curMonth : 11;
+    for(let m=0; m<=lastMonth; m++){
+      const ld=new Date(year,m+1,0).getDate();
+      periods.push({start:`${year}-${String(m+1).padStart(2,'0')}-01`,
+                    end:`${year}-${String(m+1).padStart(2,'0')}-${ld}`});
+    }
   }
 
   try{
