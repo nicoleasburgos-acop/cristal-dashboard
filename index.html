@@ -204,7 +204,7 @@ async function fetchVendas(start, end){
       .then(r => r.ok ? r.json() : [])
       .catch(() => [])
   ));
-  return results.flat().filter(Array.isArray(results) ? true : true);
+  return results.flat();
 }
 
 function processarVendas(vendas){
