@@ -145,33 +145,20 @@ tr:hover td{background:var(--surface2);}
 const API_CNPJ = '07542559000192';
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-// De-para: código do tipo de produto (como vem da API) -> nome de exibição
-// Baseado na nomenclatura usada na base histórica da loja (coluna "Tipos")
+// De-para: grupo como vem da API SSótica -> nome de exibição normalizado
+// Chaves sem acentos (normalizadas) para garantir o match independente da formatação da API
 const TIPOS_NOMES = {
-  'RX': 'Receituário',
-  'VS': 'Visão Simples',
-  'DIV': 'Diversos',
-  'MULT': 'Multifocal',
-  'SOLAR': 'Solar',
-  'TRAT': 'Tratamento',
-  'LC': 'Lente de Contato',
-  'CONS': 'Conserto',
-  'ASSIS': 'Assistência Técnica',
-  'OCUPA': 'Ocupacional',
-  'MONT': 'Montagem/Armação',
-  'BIF': 'Bifocal',
-  'MULT DOBRO': 'Multifocal (Dobro)',
-  'VS DOBRO': 'Visão Simples (Dobro)',
-  'REL': 'Relógio',
-  'DOBRO': 'Dobro',
-  'CORREIOS': 'Correios/Envio',
-  'PROMO': 'Promoção',
-  'SERV': 'Serviço',
-  'RX PROMO': 'Receituário Promoção',
-  'VS PROMO': 'Visão Simples Promoção',
-  'OCUPA DOBRO': 'Ocupacional (Dobro)',
-  'TRAT GRATIS': 'Tratamento Grátis',
-  'LICITAÇÃO': 'Licitação'
+  'LENTE MULTIFOCAL':      'Lente Multifocal',
+  'ARMACOES ACETATO':      'Armações Acetato',
+  'ARMACOES NYLON/METAL':  'Armações Nylon/Metal',
+  'LENTE VISAO SIMPLES':   'Lente Visão Simples',
+  'OCULOS SOLAR':          'Óculos Solar',
+  'TRATAMENTO EM LENTES':  'Tratamento em Lentes',
+  'LENTE OCUPACIONAL':     'Lente Ocupacional',
+  'ACESSORIOS':            'Acessórios',
+  'LENTES DE CONTATO':     'Lentes de Contato',
+  'ASSISTENCIA':           'Assistência',
+  'SERVICOS':              'Serviços',
 };
 
 function nomeTipo(codigo){
