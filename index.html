@@ -73,6 +73,25 @@ tr:hover td{background:var(--surface2);}
 .aviso-variacao .aviso-icone{font-size:18px;flex-shrink:0;margin-top:1px;}
 .aviso-variacao strong{color:var(--text);font-weight:700;}
 .aviso-variacao em{font-style:normal;font-weight:600;}
+
+/* Cards de venda */
+.venda-card{border:1px solid var(--border2);border-radius:10px;margin-bottom:12px;overflow:hidden;}
+.venda-card:last-child{margin-bottom:0;}
+.venda-header{display:flex;align-items:center;gap:16px;padding:14px 16px;background:var(--surface2);flex-wrap:wrap;}
+.venda-cliente{font-weight:700;font-size:14px;flex:1;min-width:160px;}
+.venda-meta{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text3);flex-wrap:wrap;}
+.venda-meta strong{color:var(--text2);font-weight:600;}
+.venda-valor{font-weight:800;font-size:15px;color:var(--text);white-space:nowrap;}
+.venda-badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;}
+.badge-novo{background:#E8F5E9;color:#1A9E5C;}
+.badge-antigo{background:#E3F2FD;color:#1565C0;}
+.venda-itens{overflow-x:auto;}
+.venda-itens table{margin:0;}
+.venda-itens th{background:var(--surface3);font-size:10.5px;}
+.venda-itens td{font-size:13px;padding:9px 10px;}
+.venda-ref{font-weight:600;color:var(--text);}
+.venda-ajuste{color:var(--green);font-size:12px;font-weight:600;}
+.venda-ajuste.neg{color:var(--red);}
 </style>
 </head>
 <body>
@@ -113,6 +132,17 @@ tr:hover td{background:var(--surface2);}
       <div class="kpi-label">Ticket Médio</div>
       <div class="kpi-val" id="kpi-ticket">—</div>
     </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <div style="display:flex;align-items:center;gap:8px;"><span class="bar"></span>Vendas do Período</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span id="vendas-count" style="font-size:12px;font-weight:600;color:var(--text3);"></span>
+        <button class="btn btn-ghost" style="font-size:12px;padding:6px 14px;" onclick="toggleVendas()">Mostrar / Ocultar</button>
+      </div>
+    </div>
+    <div id="lista-vendas" style="display:none;"></div>
   </div>
 
   <div class="aviso-variacao">
@@ -169,20 +199,19 @@ tr:hover td{background:var(--surface2);}
 const API_CNPJ = '07542559000192';
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-// De-para: grupo como vem da API SSótica -> nome de exibição normalizado
-// Chaves sem acentos (normalizadas) para garantir o match independente da formatação da API
+// De-para: grupo como vem da API SSótica -> grupo de exibição consolidado
 const TIPOS_NOMES = {
-  'LENTE MULTIFOCAL':      'Lente Multifocal',
-  'ARMACOES ACETATO':      'Armações Acetato',
-  'ARMACOES NYLON/METAL':  'Armações Nylon/Metal',
-  'LENTE VISAO SIMPLES':   'Lente Visão Simples',
-  'OCULOS SOLAR':          'Óculos Solar',
-  'TRATAMENTO EM LENTES':  'Tratamento em Lentes',
-  'LENTE OCUPACIONAL':     'Lente Ocupacional',
-  'ACESSORIOS':            'Acessórios',
-  'LENTES DE CONTATO':     'Lentes de Contato',
-  'ASSISTENCIA':           'Assistência',
-  'SERVICOS':              'Serviços',
+  'LENTE MULTIFOCAL':      'Multifocal',
+  'LENTE VISAO SIMPLES':   'Visão Simples',
+  'LENTE OCUPACIONAL':     'Ocupacional',
+  'ARMACOES ACETATO':      'Armação',
+  'ARMACOES NYLON/METAL':  'Armação',
+  'OCULOS SOLAR':          'Solar',
+  'TRATAMENTO EM LENTES':  'Tratamento',
+  'ACESSORIOS':            'Div',
+  'LENTES DE CONTATO':     'Div',
+  'ASSISTENCIA':           'Div',
+  'SERVICOS':              'Div',
 };
 
 function nomeTipo(codigo){
@@ -294,6 +323,88 @@ async function fetchVendas(start, end){
 }
 
 const SEMANAS_ORDEM = ['1ª Semana','2ª Semana','3ª Semana','4ª Semana','5ª Semana'];
+
+function toggleVendas(){
+  const el = document.getElementById('lista-vendas');
+  el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
+function renderVendas(vendas){
+  const el = document.getElementById('lista-vendas');
+  const count = document.getElementById('vendas-count');
+
+  // Filtra apenas ATIVA e ordena mais recente primeiro
+  const lista = vendas
+    .filter(v => v.status === 'ATIVA')
+    .sort((a,b) => b.data.localeCompare(a.data) || (b.id||0)-(a.id||0));
+
+  count.textContent = `${lista.length.toLocaleString('pt-BR')} vendas`;
+
+  if(!lista.length){ el.innerHTML='<div class="empty">Nenhuma venda encontrada.</div>'; return; }
+
+  el.innerHTML = lista.map(v => {
+    const cliente = tituloCase(v.cliente?.nome || 'Cliente não informado');
+    const consultor = tituloCase(v.funcionario?.nome || '—');
+    const numVenda = v.numero || v.id || '—';
+    const dataFmt = v.data ? new Date(v.data+'T00:00:00').toLocaleDateString('pt-BR') : '—';
+    const hora = v.hora || '';
+    const valorTotal = fmtMoney(v.valor_total || v.itens?.reduce((s,i)=>s+(+i.valor_total||0),0) || 0);
+    const isNovo = String(v.cliente?.tipo||'').toLowerCase().includes('novo');
+
+    // OS vinculadas
+    const osNums = [...new Set((v.itens||[]).map(i=>i.ordem_servico?.numero||i.os_numero||'').filter(Boolean))];
+    const osStr = osNums.map(n=>`<strong>#${n}</strong>`).join(' ');
+
+    // Itens
+    const itensHtml = (v.itens||[]).map(item => {
+      const ref = item.produto?.referencia || '—';
+      const desc = tituloCase(item.produto?.descricao || item.produto?.nome || '');
+      const qty = +item.quantidade || 0;
+      const valUnit = +item.valor_unitario || 0;
+      const valUnitLiq = +item.valor_unitario_liquido || (+item.valor_total_liquido / (qty||1)) || 0;
+      const valTotal = +item.valor_total_liquido || 0;
+      const ajuste = valUnitLiq - valUnit;
+      const ajusteHtml = ajuste !== 0
+        ? `<span class="venda-ajuste${ajuste<0?' neg':''}">${ajuste>0?'+':''}${ajuste.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>`
+        : '—';
+      return `<tr>
+        <td><span class="venda-ref">${ref}</span>${desc ? ' — '+desc : ''}</td>
+        <td class="num">${qty}</td>
+        <td class="num">${valUnit ? fmtMoney(valUnit) : '—'}</td>
+        <td class="num">${ajusteHtml}</td>
+        <td class="num">${valUnitLiq ? fmtMoney(valUnitLiq) : '—'}</td>
+        <td class="num" style="font-weight:700">${fmtMoney(valTotal)}</td>
+      </tr>`;
+    }).join('');
+
+    return `<div class="venda-card">
+      <div class="venda-header">
+        <div class="venda-cliente">${cliente}</div>
+        <div class="venda-meta">
+          <span>👤 <strong>${consultor}</strong></span>
+          <span>🛒 <strong>#${numVenda}</strong></span>
+          ${osStr ? `<span>🔧 ${osStr}</span>` : ''}
+          <span>📅 ${dataFmt}${hora ? ' '+hora : ''}</span>
+        </div>
+        <div class="venda-valor">${valorTotal}</div>
+        ${isNovo ? '<span class="venda-badge badge-novo">Novo Cliente</span>' : '<span class="venda-badge badge-antigo">Cliente Antigo</span>'}
+      </div>
+      <div class="venda-itens">
+        <table>
+          <thead><tr>
+            <th>Ref. — Produto</th>
+            <th class="num">Qtde</th>
+            <th class="num">Val. Unit.</th>
+            <th class="num">Ajuste</th>
+            <th class="num">Val. Un. Líq.</th>
+            <th class="num">Val. Total</th>
+          </tr></thead>
+          <tbody>${itensHtml}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+}
 
 function dayToSem(dateStr){
   const d = new Date(dateStr+'T00:00:00').getDate();
@@ -614,6 +725,7 @@ async function carregar(){
     renderTabela('tabela-semana', porSemana, 'Semana', totalVal);
     renderTabelaConsultorSemana(consultorSemana);
 
+    renderVendas(vendas);
     renderChartEvolucao(porData);
     renderChartConsultor(porConsultor);
     renderChartTipo(porTipo);
