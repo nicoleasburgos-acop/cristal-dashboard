@@ -68,6 +68,11 @@ tr:hover td{background:var(--surface2);}
 .loading-text{font-size:13px;font-weight:600;color:var(--text2);}
 
 .empty{text-align:center;padding:40px;color:var(--text3);font-size:14px;}
+
+.aviso-variacao{display:flex;gap:12px;align-items:flex-start;background:#FFF8E7;border:1px solid #F0D080;border-radius:12px;padding:16px 20px;margin-bottom:24px;font-size:13px;line-height:1.6;color:var(--text2);}
+.aviso-variacao .aviso-icone{font-size:18px;flex-shrink:0;margin-top:1px;}
+.aviso-variacao strong{color:var(--text);font-weight:700;}
+.aviso-variacao em{font-style:normal;font-weight:600;}
 </style>
 </head>
 <body>
@@ -107,6 +112,14 @@ tr:hover td{background:var(--surface2);}
     <div class="kpi-card">
       <div class="kpi-label">Ticket Médio</div>
       <div class="kpi-val" id="kpi-ticket">—</div>
+    </div>
+  </div>
+
+  <div class="aviso-variacao">
+    <span class="aviso-icone">ℹ️</span>
+    <div>
+      <strong>Pequena variação em relação ao relatório oficial do sistema</strong><br>
+      O valor exibido aqui pode apresentar diferença de até 1% em relação ao relatório "Produtos Vendidos" do SSótica. Isso ocorre porque a API utilizada pelo dashboard contabiliza todas as vendas com status <em>Ativa</em>, incluindo itens que ainda estão em estados intermediários no sistema — como vendas com <strong>Ordem de Serviço pendente</strong>, <strong>entrega não finalizada</strong> ou <strong>orçamento parcialmente convertido</strong>. Esses itens já aparecem na API, mas o relatório oficial só os consolida após a conclusão do processo. Para valores oficiais e auditoria, utilize sempre o relatório "Produtos Vendidos" diretamente no SSótica.
     </div>
   </div>
 
