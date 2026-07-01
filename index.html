@@ -77,21 +77,43 @@ tr:hover td{background:var(--surface2);}
 /* Cards de venda */
 .venda-card{border:1px solid var(--border2);border-radius:10px;margin-bottom:12px;overflow:hidden;}
 .venda-card:last-child{margin-bottom:0;}
-.venda-header{display:flex;align-items:center;gap:16px;padding:14px 16px;background:var(--surface2);flex-wrap:wrap;}
+.venda-header{display:flex;align-items:flex-start;gap:14px;padding:14px 16px;background:var(--surface2);flex-wrap:wrap;cursor:pointer;user-select:none;}
+.venda-header:hover{background:var(--surface3);}
+.venda-chevron{font-size:12px;color:var(--text3);transition:transform .2s;flex-shrink:0;margin-top:2px;}
+.venda-card.aberto .venda-chevron{transform:rotate(180deg);}
+.venda-body{display:none;}
+.venda-card.aberto .venda-body{display:block;}
 .venda-cliente{font-weight:700;font-size:14px;flex:1;min-width:160px;}
-.venda-meta{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text3);flex-wrap:wrap;}
-.venda-meta strong{color:var(--text2);font-weight:600;}
-.venda-valor{font-weight:800;font-size:15px;color:var(--text);white-space:nowrap;}
+.venda-meta-col{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text3);}
+.venda-meta-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.venda-meta-item{display:flex;align-items:center;gap:5px;}
+.venda-meta-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text3);}
+.venda-meta-val{font-size:12.5px;font-weight:600;color:var(--text2);}
+.venda-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;}
+.venda-valor{font-weight:800;font-size:16px;color:var(--text);}
 .venda-badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;}
 .badge-novo{background:#E8F5E9;color:#1A9E5C;}
 .badge-antigo{background:#E3F2FD;color:#1565C0;}
-.venda-itens{overflow-x:auto;}
-.venda-itens table{margin:0;}
-.venda-itens th{background:var(--surface3);font-size:10.5px;}
-.venda-itens td{font-size:13px;padding:9px 10px;}
+/* Abas */
+.venda-tabs{display:flex;border-top:1px solid var(--border2);}
+.venda-tab-btn{background:none;border:none;border-bottom:2px solid transparent;padding:10px 16px;font-family:inherit;font-size:12.5px;font-weight:600;color:var(--text3);cursor:pointer;transition:color .15s,border-color .15s;}
+.venda-tab-btn.active{color:var(--blue-lt);border-bottom-color:var(--blue-lt);}
+.venda-tab-btn:hover{color:var(--text2);}
+.venda-tab-panel{display:none;overflow-x:auto;}
+.venda-tab-panel.active{display:block;}
+.venda-tab-panel table{margin:0;}
+.venda-tab-panel th{background:var(--surface3);font-size:10.5px;}
+.venda-tab-panel td{font-size:13px;padding:9px 10px;}
 .venda-ref{font-weight:600;color:var(--text);}
-.venda-ajuste{color:var(--green);font-size:12px;font-weight:600;}
-.venda-ajuste.neg{color:var(--red);}
+.ajuste-pos{color:var(--green);font-weight:700;}
+.ajuste-neg{color:var(--red);font-weight:700;}
+.fin-row{display:flex;justify-content:space-between;padding:9px 16px;border-bottom:1px solid var(--border2);font-size:13px;}
+.fin-row:last-child{border-bottom:none;}
+.fin-label{color:var(--text3);font-weight:600;}
+.fin-val{font-weight:700;color:var(--text);}
+.os-item{padding:12px 16px;border-bottom:1px solid var(--border2);font-size:13px;}
+.os-item:last-child{border-bottom:none;}
+.os-num{font-weight:800;color:var(--blue-lt);margin-right:8px;}
 </style>
 </head>
 <body>
@@ -277,16 +299,25 @@ const SEMANAS_ORDEM = ['1ª Semana','2ª Semana','3ª Semana','4ª Semana','5ª 
 
 let _vcardIdx = 0;
 
-function toggleItens(id){
-  const el = document.getElementById('itens-'+id);
-  const btn = document.getElementById('btn-'+id);
-  const aberto = el.style.display !== 'none';
-  el.style.display = aberto ? 'none' : '';
-  btn.textContent = aberto ? '▼ Ver produtos' : '▲ Ocultar produtos';
+function toggleCard(cid){
+  const card = document.getElementById('card-'+cid);
+  const jaAberto = card.classList.contains('aberto');
+  // Fecha todos
+  document.querySelectorAll('.venda-card.aberto').forEach(c => c.classList.remove('aberto'));
+  // Abre este se estava fechado
+  if(!jaAberto) card.classList.add('aberto');
+}
+
+function switchTab(event, cardId, aba){
+  event.stopPropagation(); // não propaga para o header
+  document.querySelectorAll(`#card-${cardId} .venda-tab-btn`).forEach(b => b.classList.remove('active'));
+  document.querySelectorAll(`#card-${cardId} .venda-tab-panel`).forEach(p => p.classList.remove('active'));
+  document.getElementById(`tab-btn-${cardId}-${aba}`).classList.add('active');
+  document.getElementById(`tab-${cardId}-${aba}`).classList.add('active');
 }
 
 function renderVendas(vendas){
-  const el = document.getElementById('lista-vendas');
+  const el    = document.getElementById('lista-vendas');
   const count = document.getElementById('vendas-count');
 
   const lista = vendas
@@ -294,71 +325,146 @@ function renderVendas(vendas){
     .sort((a,b) => b.data.localeCompare(a.data) || (b.id||0)-(a.id||0));
 
   count.textContent = `${lista.length.toLocaleString('pt-BR')} vendas`;
-
   if(!lista.length){ el.innerHTML='<div class="empty">Nenhuma venda encontrada.</div>'; return; }
 
-  el.innerHTML = lista.map((v, idx) => {
-    const id = 'vc'+(++_vcardIdx);
-    const cliente  = tituloCase(v.cliente?.nome || 'Cliente não informado');
+  el.innerHTML = lista.map(v => {
+    const cid = 'vc'+(++_vcardIdx);
+
+    // ── Cabeçalho ───────────────────────────────────────────
+    const cliente   = tituloCase(v.cliente?.nome || 'Cliente não informado');
     const consultor = tituloCase(v.funcionario?.nome || '—');
     const numVenda  = v.numero || v.id || '—';
     const dataFmt   = v.data ? new Date(v.data+'T00:00:00').toLocaleDateString('pt-BR') : '—';
-    const hora      = v.hora || '';
-    const valorTotal = fmtMoney(v.valor_total || (v.itens||[]).reduce((s,i)=>s+(+i.valor_total_liquido||0),0));
-    const isNovo    = String(v.cliente?.tipo||'').toLowerCase().includes('novo');
-    const nItens    = (v.itens||[]).length;
+    const hora      = v.hora || v.horario || '';
+    const isNovo    = String(v.cliente?.tipo||v.cliente?.classificacao||'').toLowerCase().includes('novo');
+    const valorTotal = fmtMoney(
+      +v.valor_total || +v.valor_total_liquido ||
+      (v.itens||[]).reduce((s,i)=>s+(+i.valor_total_liquido||0),0)
+    );
 
-    const osNums = [...new Set((v.itens||[]).map(i=>i.ordem_servico?.numero||i.os_numero||'').filter(Boolean))];
-    const osStr  = osNums.map(n=>`<strong>#${n}</strong>`).join(' ');
+    // Números de OS únicas
+    const osNums = [...new Set(
+      (v.ordens_servico||[]).map(o=>o.numero||o.id||'')
+        .concat((v.itens||[]).map(i=>i.os_numero||i.ordem_servico?.numero||''))
+        .filter(Boolean)
+    )];
 
+    // ── Aba 1: Produtos/Serviços ─────────────────────────────
     const itensHtml = (v.itens||[]).map(item => {
-      const ref        = item.produto?.referencia || '—';
-      const desc       = tituloCase(item.produto?.descricao || item.produto?.nome || '');
-      const qty        = +item.quantidade || 0;
-      const valUnit    = +item.valor_unitario || 0;
-      const valUnitLiq = +item.valor_unitario_liquido || ((+item.valor_total_liquido)/(qty||1)) || 0;
-      const valTotal   = +item.valor_total_liquido || 0;
-      const ajuste     = valUnitLiq - valUnit;
-      const ajusteHtml = ajuste !== 0
-        ? `<span class="venda-ajuste${ajuste<0?' neg':''}">${ajuste>0?'+':''}${ajuste.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>`
+      const ref     = item.produto?.referencia || '—';
+      const desc    = tituloCase(item.produto?.descricao || item.produto?.nome || '');
+      const grupo   = nomeTipo(item.produto?.grupo);
+      const qty     = +item.quantidade || 0;
+      // Valor unitário bruto (antes de ajuste)
+      const valUnit = +item.valor_unitario || +item.preco_unitario || 0;
+      // Valor total líquido da linha (campo confirmado pela API)
+      const valTotalLiq = +item.valor_total_liquido || 0;
+      // Valor unitário líquido calculado de forma segura
+      const valUnitLiq = qty > 0 ? valTotalLiq / qty : valTotalLiq;
+      // Ajuste = diferença entre unitário líquido e unitário bruto
+      const ajuste = valUnit > 0 ? valUnitLiq - valUnit : null;
+      const ajusteHtml = ajuste !== null && ajuste !== 0
+        ? `<span class="${ajuste>0?'ajuste-pos':'ajuste-neg'}">${ajuste>0?'+':''}${ajuste.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>`
         : '<span style="color:var(--text3)">—</span>';
+
       return `<tr>
-        <td><span class="venda-ref">${ref}</span>${desc ? ' — '+desc : ''}</td>
+        <td>
+          <div class="venda-ref">${ref}${desc?' — '+desc:''}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px;">${grupo}</div>
+        </td>
         <td class="num">${qty}</td>
-        <td class="num">${valUnit ? fmtMoney(valUnit) : '—'}</td>
+        <td class="num">${valUnit ? fmtMoney(valUnit) : '<span style="color:var(--text3)">—</span>'}</td>
         <td class="num">${ajusteHtml}</td>
-        <td class="num">${valUnitLiq ? fmtMoney(valUnitLiq) : '—'}</td>
-        <td class="num" style="font-weight:700">${fmtMoney(valTotal)}</td>
+        <td class="num">${fmtMoney(valUnitLiq)}</td>
+        <td class="num" style="font-weight:700">${fmtMoney(valTotalLiq)}</td>
       </tr>`;
     }).join('');
 
-    return `<div class="venda-card">
-      <div class="venda-header">
-        <div class="venda-cliente">${cliente}</div>
-        <div class="venda-meta">
-          <span>👤 <strong>${consultor}</strong></span>
-          <span>🛒 <strong>#${numVenda}</strong></span>
-          ${osStr ? `<span>🔧 ${osStr}</span>` : ''}
-          <span>📅 ${dataFmt}${hora?' '+hora:''}</span>
+    // ── Aba 2: Informações Financeiras ───────────────────────
+    const vTotal     = +v.valor_total || +v.valor_total_liquido || 0;
+    const vDesconto  = +v.valor_desconto || +v.desconto || 0;
+    const vEntrada   = +v.valor_entrada  || +v.entrada  || 0;
+    const vSaldo     = +v.saldo || +v.valor_restante || (vTotal - vEntrada) || 0;
+    const pagamentos = v.pagamentos || v.formas_pagamento || [];
+    const pgHtml = pagamentos.length
+      ? pagamentos.map(p=>`<div class="fin-row">
+          <span class="fin-label">${tituloCase(p.forma||p.tipo||p.descricao||'Pagamento')}</span>
+          <span class="fin-val">${fmtMoney(+p.valor||0)}</span>
+        </div>`).join('')
+      : '';
+
+    const finHtml = `
+      <div class="fin-row"><span class="fin-label">Valor Total</span><span class="fin-val">${fmtMoney(vTotal)}</span></div>
+      ${vDesconto ? `<div class="fin-row"><span class="fin-label">Desconto</span><span class="fin-val" style="color:var(--red)">- ${fmtMoney(vDesconto)}</span></div>` : ''}
+      ${vEntrada  ? `<div class="fin-row"><span class="fin-label">Entrada / Pago</span><span class="fin-val" style="color:var(--green)">${fmtMoney(vEntrada)}</span></div>` : ''}
+      ${vSaldo    ? `<div class="fin-row"><span class="fin-label">Saldo em Aberto</span><span class="fin-val" style="color:var(--accent)">${fmtMoney(vSaldo)}</span></div>` : ''}
+      ${pgHtml}
+      ${!vDesconto&&!vEntrada&&!vSaldo&&!pgHtml ? '<div style="padding:16px;color:var(--text3);font-size:13px;">Informações financeiras não disponíveis neste período.</div>' : ''}
+    `;
+
+    // ── Aba 3: Ordens de Serviço ─────────────────────────────
+    const osList = v.ordens_servico || [];
+    const osHtml = osList.length
+      ? osList.map(o=>`<div class="os-item">
+          <span class="os-num">OS #${o.numero||o.id||'—'}</span>
+          <span style="color:var(--text2);font-weight:600;">${tituloCase(o.tipo||o.descricao||'')}</span>
+          ${o.status ? `<span style="font-size:11px;color:var(--text3);margin-left:8px;">${o.status}</span>` : ''}
+          ${o.data_entrega ? `<span style="font-size:11px;color:var(--text3);margin-left:8px;">Entrega: ${new Date(o.data_entrega+'T00:00:00').toLocaleDateString('pt-BR')}</span>` : ''}
+        </div>`).join('')
+      : osNums.length
+        ? osNums.map(n=>`<div class="os-item"><span class="os-num">OS #${n}</span><span style="color:var(--text3);font-size:12px;">Detalhes disponíveis ao consultar a OS diretamente no sistema.</span></div>`).join('')
+        : '<div style="padding:16px;color:var(--text3);font-size:13px;">Nenhuma Ordem de Serviço vinculada a esta venda.</div>';
+
+    return `<div class="venda-card" id="card-${cid}">
+      <div class="venda-header" onclick="toggleCard('${cid}')">
+        <div style="flex:1;min-width:180px;">
+          <div class="venda-cliente">${cliente}</div>
+          <div style="margin-top:6px;" class="venda-meta-row">
+            <div class="venda-meta-item">
+              <span class="venda-meta-label">Consultor</span>
+              <span class="venda-meta-val">${consultor}</span>
+            </div>
+            <div class="venda-meta-item">
+              <span class="venda-meta-label">Venda</span>
+              <span class="venda-meta-val">#${numVenda}</span>
+            </div>
+            ${osNums.length ? `<div class="venda-meta-item">
+              <span class="venda-meta-label">OS</span>
+              <span class="venda-meta-val">${osNums.map(n=>'#'+n).join(', ')}</span>
+            </div>` : ''}
+            <div class="venda-meta-item">
+              <span class="venda-meta-label">Data</span>
+              <span class="venda-meta-val">${dataFmt}${hora?' '+hora:''}</span>
+            </div>
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+        <div class="venda-right">
           <div class="venda-valor">${valorTotal}</div>
-          ${isNovo ? '<span class="venda-badge badge-novo">Novo Cliente</span>' : '<span class="venda-badge badge-antigo">Cliente Antigo</span>'}
-          <button id="btn-${id}" class="btn btn-ghost" style="font-size:11px;padding:5px 12px;white-space:nowrap;" onclick="toggleItens('${id}')">▼ Ver produtos</button>
+          <span class="venda-badge ${isNovo?'badge-novo':'badge-antigo'}">${isNovo?'Novo Cliente':'Cliente Antigo'}</span>
         </div>
+        <span class="venda-chevron">▼</span>
       </div>
-      <div id="itens-${id}" class="venda-itens" style="display:none;">
-        <table>
-          <thead><tr>
-            <th>Ref. — Produto</th>
-            <th class="num">Qtde</th>
-            <th class="num">Val. Unit.</th>
-            <th class="num">Ajuste</th>
-            <th class="num">Val. Un. Líq.</th>
-            <th class="num">Val. Total</th>
-          </tr></thead>
-          <tbody>${itensHtml}</tbody>
-        </table>
+      <div class="venda-body">
+        <div class="venda-tabs">
+          <button id="tab-btn-${cid}-prod" class="venda-tab-btn active" onclick="switchTab(event,'${cid}','prod')">Produtos / Serviços</button>
+          <button id="tab-btn-${cid}-fin"  class="venda-tab-btn"        onclick="switchTab(event,'${cid}','fin')">Informações Financeiras</button>
+          <button id="tab-btn-${cid}-os"   class="venda-tab-btn"        onclick="switchTab(event,'${cid}','os')">Ordens de Serviço</button>
+        </div>
+        <div id="tab-${cid}-prod" class="venda-tab-panel active">
+          <table>
+            <thead><tr>
+              <th>Ref. — Produto</th>
+              <th class="num">Qtde</th>
+              <th class="num">Val. Unit.</th>
+              <th class="num">Ajuste</th>
+              <th class="num">Val. Un. Líq.</th>
+              <th class="num">Val. Total</th>
+            </tr></thead>
+            <tbody>${itensHtml}</tbody>
+          </table>
+        </div>
+        <div id="tab-${cid}-fin" class="venda-tab-panel">${finHtml}</div>
+        <div id="tab-${cid}-os"  class="venda-tab-panel">${osHtml}</div>
       </div>
     </div>`;
   }).join('');
