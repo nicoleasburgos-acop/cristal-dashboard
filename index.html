@@ -137,58 +137,9 @@ tr:hover td{background:var(--surface2);}
   <div class="section">
     <div class="section-title" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">
       <div style="display:flex;align-items:center;gap:8px;"><span class="bar"></span>Vendas do Período</div>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span id="vendas-count" style="font-size:12px;font-weight:600;color:var(--text3);"></span>
-        <button class="btn btn-ghost" style="font-size:12px;padding:6px 14px;" onclick="toggleVendas()">Mostrar / Ocultar</button>
-      </div>
+      <span id="vendas-count" style="font-size:12px;font-weight:600;color:var(--text3);"></span>
     </div>
-    <div id="lista-vendas" style="display:none;"></div>
-  </div>
-
-  <div class="aviso-variacao">
-    <span class="aviso-icone">ℹ️</span>
-    <div>
-      <strong>Pequena variação em relação ao relatório oficial do sistema</strong><br>
-      O valor exibido aqui pode apresentar diferença de até 1% em relação ao relatório "Produtos Vendidos" do SSótica. Isso ocorre porque a API utilizada pelo dashboard contabiliza todas as vendas com status <em>Ativa</em>, incluindo itens que ainda estão em estados intermediários no sistema — como vendas com <strong>Ordem de Serviço pendente</strong>, <strong>entrega não finalizada</strong> ou <strong>orçamento parcialmente convertido</strong>. Esses itens já aparecem na API, mas o relatório oficial só os consolida após a conclusão do processo. Para valores oficiais e auditoria, utilize sempre o relatório "Produtos Vendidos" diretamente no SSótica.
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title"><span class="bar"></span>Evolução de Vendas no Período</div>
-    <div class="chart-wrap"><canvas id="chart-evolucao"></canvas></div>
-  </div>
-
-  <div class="grid-2" style="margin-bottom:24px;">
-    <div class="section">
-      <div class="section-title"><span class="bar"></span>Por Consultor</div>
-      <div class="chart-wrap small"><canvas id="chart-consultor"></canvas></div>
-      <div id="tabela-consultor" style="margin-top:18px;"></div>
-    </div>
-    <div class="section">
-      <div class="section-title"><span class="bar"></span>Mix por Tipo de Produto</div>
-      <div class="chart-wrap small"><canvas id="chart-tipo"></canvas></div>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title"><span class="bar"></span>Por Tipo de Produto</div>
-    <div id="tabela-tipo"></div>
-  </div>
-
-  <div class="section">
-    <div class="section-title"><span class="bar"></span>Top Marcas</div>
-    <div id="tabela-marca"></div>
-  </div>
-
-  <div class="section">
-    <div class="section-title"><span class="bar"></span>Por Semana do Mês</div>
-    <div class="chart-wrap" style="height:220px;margin-bottom:18px;"><canvas id="chart-semana"></canvas></div>
-    <div id="tabela-semana"></div>
-  </div>
-
-  <div class="section">
-    <div class="section-title"><span class="bar"></span>Consultor × Semana</div>
-    <div id="tabela-consultor-semana"></div>
+    <div id="lista-vendas"></div>
   </div>
 
 </div>
@@ -324,16 +275,20 @@ async function fetchVendas(start, end){
 
 const SEMANAS_ORDEM = ['1ª Semana','2ª Semana','3ª Semana','4ª Semana','5ª Semana'];
 
-function toggleVendas(){
-  const el = document.getElementById('lista-vendas');
-  el.style.display = el.style.display === 'none' ? '' : 'none';
+let _vcardIdx = 0;
+
+function toggleItens(id){
+  const el = document.getElementById('itens-'+id);
+  const btn = document.getElementById('btn-'+id);
+  const aberto = el.style.display !== 'none';
+  el.style.display = aberto ? 'none' : '';
+  btn.textContent = aberto ? '▼ Ver produtos' : '▲ Ocultar produtos';
 }
 
 function renderVendas(vendas){
   const el = document.getElementById('lista-vendas');
   const count = document.getElementById('vendas-count');
 
-  // Filtra apenas ATIVA e ordena mais recente primeiro
   const lista = vendas
     .filter(v => v.status === 'ATIVA')
     .sort((a,b) => b.data.localeCompare(a.data) || (b.id||0)-(a.id||0));
@@ -342,31 +297,31 @@ function renderVendas(vendas){
 
   if(!lista.length){ el.innerHTML='<div class="empty">Nenhuma venda encontrada.</div>'; return; }
 
-  el.innerHTML = lista.map(v => {
-    const cliente = tituloCase(v.cliente?.nome || 'Cliente não informado');
+  el.innerHTML = lista.map((v, idx) => {
+    const id = 'vc'+(++_vcardIdx);
+    const cliente  = tituloCase(v.cliente?.nome || 'Cliente não informado');
     const consultor = tituloCase(v.funcionario?.nome || '—');
-    const numVenda = v.numero || v.id || '—';
-    const dataFmt = v.data ? new Date(v.data+'T00:00:00').toLocaleDateString('pt-BR') : '—';
-    const hora = v.hora || '';
-    const valorTotal = fmtMoney(v.valor_total || v.itens?.reduce((s,i)=>s+(+i.valor_total||0),0) || 0);
-    const isNovo = String(v.cliente?.tipo||'').toLowerCase().includes('novo');
+    const numVenda  = v.numero || v.id || '—';
+    const dataFmt   = v.data ? new Date(v.data+'T00:00:00').toLocaleDateString('pt-BR') : '—';
+    const hora      = v.hora || '';
+    const valorTotal = fmtMoney(v.valor_total || (v.itens||[]).reduce((s,i)=>s+(+i.valor_total_liquido||0),0));
+    const isNovo    = String(v.cliente?.tipo||'').toLowerCase().includes('novo');
+    const nItens    = (v.itens||[]).length;
 
-    // OS vinculadas
     const osNums = [...new Set((v.itens||[]).map(i=>i.ordem_servico?.numero||i.os_numero||'').filter(Boolean))];
-    const osStr = osNums.map(n=>`<strong>#${n}</strong>`).join(' ');
+    const osStr  = osNums.map(n=>`<strong>#${n}</strong>`).join(' ');
 
-    // Itens
     const itensHtml = (v.itens||[]).map(item => {
-      const ref = item.produto?.referencia || '—';
-      const desc = tituloCase(item.produto?.descricao || item.produto?.nome || '');
-      const qty = +item.quantidade || 0;
-      const valUnit = +item.valor_unitario || 0;
-      const valUnitLiq = +item.valor_unitario_liquido || (+item.valor_total_liquido / (qty||1)) || 0;
-      const valTotal = +item.valor_total_liquido || 0;
-      const ajuste = valUnitLiq - valUnit;
+      const ref        = item.produto?.referencia || '—';
+      const desc       = tituloCase(item.produto?.descricao || item.produto?.nome || '');
+      const qty        = +item.quantidade || 0;
+      const valUnit    = +item.valor_unitario || 0;
+      const valUnitLiq = +item.valor_unitario_liquido || ((+item.valor_total_liquido)/(qty||1)) || 0;
+      const valTotal   = +item.valor_total_liquido || 0;
+      const ajuste     = valUnitLiq - valUnit;
       const ajusteHtml = ajuste !== 0
         ? `<span class="venda-ajuste${ajuste<0?' neg':''}">${ajuste>0?'+':''}${ajuste.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>`
-        : '—';
+        : '<span style="color:var(--text3)">—</span>';
       return `<tr>
         <td><span class="venda-ref">${ref}</span>${desc ? ' — '+desc : ''}</td>
         <td class="num">${qty}</td>
@@ -384,12 +339,15 @@ function renderVendas(vendas){
           <span>👤 <strong>${consultor}</strong></span>
           <span>🛒 <strong>#${numVenda}</strong></span>
           ${osStr ? `<span>🔧 ${osStr}</span>` : ''}
-          <span>📅 ${dataFmt}${hora ? ' '+hora : ''}</span>
+          <span>📅 ${dataFmt}${hora?' '+hora:''}</span>
         </div>
-        <div class="venda-valor">${valorTotal}</div>
-        ${isNovo ? '<span class="venda-badge badge-novo">Novo Cliente</span>' : '<span class="venda-badge badge-antigo">Cliente Antigo</span>'}
+        <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+          <div class="venda-valor">${valorTotal}</div>
+          ${isNovo ? '<span class="venda-badge badge-novo">Novo Cliente</span>' : '<span class="venda-badge badge-antigo">Cliente Antigo</span>'}
+          <button id="btn-${id}" class="btn btn-ghost" style="font-size:11px;padding:5px 12px;white-space:nowrap;" onclick="toggleItens('${id}')">▼ Ver produtos</button>
+        </div>
       </div>
-      <div class="venda-itens">
+      <div id="itens-${id}" class="venda-itens" style="display:none;">
         <table>
           <thead><tr>
             <th>Ref. — Produto</th>
@@ -486,201 +444,13 @@ function agregarConsultorPorSemana(rows){
   return {consultores, semanas, pivot};
 }
 
-function agregarPorData(rows){
-  const map = {};
-  for(const r of rows){
-    if(!map[r.data]) map[r.data] = {qty:0, val:0};
-    map[r.data].qty += r.qty;
-    map[r.data].val += r.val;
-  }
-  return Object.entries(map)
-    .map(([data,d]) => ({data, ...d}))
-    .sort((a,b) => a.data.localeCompare(b.data));
-}
-
-function renderTabela(containerId, dados, labelCol, totalVal){
-  const el = document.getElementById(containerId);
-  if(!dados.length){
-    el.innerHTML = '<div class="empty">Nenhum dado encontrado para o período selecionado.</div>';
-    return;
-  }
-  el.innerHTML = `
-    <table>
-      <thead><tr>
-        <th>${labelCol}</th>
-        <th class="num">Quantidade</th>
-        <th class="num">Ticket Médio</th>
-        <th class="num">Valor Vendido</th>
-        ${totalVal ? '<th class="num">% Mix</th>' : ''}
-      </tr></thead>
-      <tbody>
-        ${dados.map((d,i) => `
-          <tr>
-            <td><span class="rank">${i+1}</span>${d.nome}</td>
-            <td class="num">${fmtInt(d.qty)}</td>
-            <td class="num">${fmtMoney(d.ticket)}</td>
-            <td class="num">${fmtMoney(d.val)}</td>
-            ${totalVal ? `<td class="num pct">${((d.val/totalVal)*100).toFixed(1)}%</td>` : ''}
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
-  `;
-}
-
-function destruirChart(id){
-  if(charts[id]){ charts[id].destroy(); delete charts[id]; }
-}
-
-function renderChartEvolucao(porData){
-  destruirChart('evolucao');
-  const ctx = document.getElementById('chart-evolucao');
-  charts.evolucao = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: porData.map(d => new Date(d.data+'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})),
-      datasets: [{
-        label: 'Valor Vendido',
-        data: porData.map(d => d.val),
-        backgroundColor: '#2A7DC9',
-        borderRadius: 4,
-        maxBarThickness: 28
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display:false }, tooltip: { callbacks: { label: c => fmtMoney(c.parsed.y) } } },
-      scales: {
-        y: { ticks: { callback: v => 'R$ '+v.toLocaleString('pt-BR') }, grid: { color:'#EDF0F5' } },
-        x: { grid: { display:false } }
-      }
-    }
-  });
-}
-
-function renderChartConsultor(dados){
-  destruirChart('consultor');
-  const top = dados.slice(0, 8);
-  const ctx = document.getElementById('chart-consultor');
-  charts.consultor = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: top.map(d => d.nome),
-      datasets: [{
-        label: 'Valor Vendido',
-        data: top.map(d => d.val),
-        backgroundColor: CHART_COLORS[0],
-        borderRadius: 4,
-        maxBarThickness: 22
-      }]
-    },
-    options: {
-      indexAxis: 'y',
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display:false }, tooltip: { callbacks: { label: c => fmtMoney(c.parsed.x) } } },
-      scales: {
-        x: { ticks: { callback: v => 'R$ '+v.toLocaleString('pt-BR') }, grid: { color:'#EDF0F5' } },
-        y: { grid: { display:false } }
-      }
-    }
-  });
-}
-
-function renderChartTipo(dados){
-  destruirChart('tipo');
-  const top = dados.slice(0, 8);
-  const ctx = document.getElementById('chart-tipo');
-  charts.tipo = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: top.map(d => d.nome),
-      datasets: [{
-        data: top.map(d => d.val),
-        backgroundColor: CHART_COLORS,
-        borderWidth: 2,
-        borderColor: '#fff'
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { position:'right', labels:{ boxWidth:12, font:{size:11} } },
-        tooltip: { callbacks: { label: c => `${c.label}: ${fmtMoney(c.parsed)}` } }
-      }
-    }
-  });
-}
-
-function renderChartSemana(dados){
-  destruirChart('semana');
-  const ctx = document.getElementById('chart-semana');
-  charts.semana = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: dados.map(d => d.nome),
-      datasets: [{
-        label: 'Valor Vendido',
-        data: dados.map(d => d.val),
-        backgroundColor: CHART_COLORS,
-        borderRadius: 6,
-        maxBarThickness: 60
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend:{display:false}, tooltip:{ callbacks:{ label: c => fmtMoney(c.parsed.y) } } },
-      scales: {
-        y: { ticks:{ callback: v => 'R$ '+v.toLocaleString('pt-BR') }, grid:{ color:'#EDF0F5' } },
-        x: { grid:{ display:false } }
-      }
-    }
-  });
-}
-
-function renderTabelaConsultorSemana({consultores, semanas, pivot}){
-  const el = document.getElementById('tabela-consultor-semana');
-  if(!consultores.length){ el.innerHTML='<div class="empty">Nenhum dado.</div>'; return; }
-  const rows = consultores.map(c => {
-    const total = semanas.reduce((s,sem)=>s+(pivot[c][sem]||0),0);
-    const colunas = semanas.map(sem => {
-      const v = pivot[c][sem]||0;
-      return `<td class="num">${v ? fmtMoney(v) : '<span style="color:var(--text3)">—</span>'}</td>`;
-    }).join('');
-    return `<tr><td><strong>${c}</strong></td>${colunas}<td class="num" style="font-weight:700">${fmtMoney(total)}</td></tr>`;
-  });
-
-  // Linha de total geral
-  const totaisSemana = semanas.map(sem =>
-    consultores.reduce((s,c)=>s+(pivot[c][sem]||0),0)
-  );
-  const totalGeral = totaisSemana.reduce((s,v)=>s+v,0);
-  const linhaTotal = `<tr style="background:var(--surface2);font-weight:700">
-    <td>Total</td>
-    ${totaisSemana.map(v=>`<td class="num">${fmtMoney(v)}</td>`).join('')}
-    <td class="num">${fmtMoney(totalGeral)}</td>
-  </tr>`;
-
-  el.innerHTML = `<div style="overflow-x:auto"><table>
-    <thead><tr>
-      <th>Consultor</th>
-      ${semanas.map(s=>`<th class="num">${s}</th>`).join('')}
-      <th class="num">Total</th>
-    </tr></thead>
-    <tbody>${rows.join('')}${linhaTotal}</tbody>
-  </table></div>`;
-}
-
 function limparTudo(){
   document.getElementById('kpi-qty').textContent = '0';
   document.getElementById('kpi-ticket').textContent = fmtMoney(0);
   document.getElementById('kpi-valor').textContent = fmtMoney(0);
   document.getElementById('kpi-nvendas').textContent = '0';
-  renderTabela('tabela-consultor', [], 'Consultor');
-  renderTabela('tabela-tipo', [], 'Tipo');
-  renderTabela('tabela-marca', [], 'Marca');
-  renderTabela('tabela-semana', [], 'Semana');
-  document.getElementById('tabela-consultor-semana').innerHTML = '';
-  destruirChart('evolucao'); destruirChart('consultor'); destruirChart('tipo'); destruirChart('semana');
+  document.getElementById('lista-vendas').innerHTML = '';
+  document.getElementById('vendas-count').textContent = '';
 }
 
 async function carregar(){
@@ -711,25 +481,7 @@ async function carregar(){
     document.getElementById('kpi-qty').textContent = fmtInt(totalQty);
     document.getElementById('kpi-ticket').textContent = fmtMoney(ticketMedio);
 
-    const porConsultor = agregarPor(rows, 'consultor');
-    const porTipo = agregarPor(rows, 'tipo');
-    const porMarca = agregarPor(rows, 'marca');
-    const porData = agregarPorData(rows);
-
-    const porSemana = agregarPorSemana(rows);
-    const consultorSemana = agregarConsultorPorSemana(rows);
-
-    renderTabela('tabela-consultor', porConsultor, 'Consultor');
-    renderTabela('tabela-tipo', porTipo, 'Tipo de Produto', totalVal);
-    renderTabela('tabela-marca', porMarca.slice(0,15), 'Marca');
-    renderTabela('tabela-semana', porSemana, 'Semana', totalVal);
-    renderTabelaConsultorSemana(consultorSemana);
-
     renderVendas(vendas);
-    renderChartEvolucao(porData);
-    renderChartConsultor(porConsultor);
-    renderChartTipo(porTipo);
-    renderChartSemana(porSemana);
 
     showLoading(false);
     showStatus(`✅ ${nVendas.toLocaleString('pt-BR')} vendas carregadas — ${periodo.start} a ${periodo.end}`, false, 5000);
