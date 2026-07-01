@@ -94,26 +94,21 @@ tr:hover td{background:var(--surface2);}
 .venda-badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;}
 .badge-novo{background:#E8F5E9;color:#1A9E5C;}
 .badge-antigo{background:#E3F2FD;color:#1565C0;}
-/* Abas */
-.venda-tabs{display:flex;border-top:1px solid var(--border2);}
-.venda-tab-btn{background:none;border:none;border-bottom:2px solid transparent;padding:10px 16px;font-family:inherit;font-size:12.5px;font-weight:600;color:var(--text3);cursor:pointer;transition:color .15s,border-color .15s;}
-.venda-tab-btn.active{color:var(--blue-lt);border-bottom-color:var(--blue-lt);}
-.venda-tab-btn:hover{color:var(--text2);}
-.venda-tab-panel{display:none;overflow-x:auto;}
-.venda-tab-panel.active{display:block;}
-.venda-tab-panel table{margin:0;}
-.venda-tab-panel th{background:var(--surface3);font-size:10.5px;}
-.venda-tab-panel td{font-size:13px;padding:9px 10px;}
+/* Produtos inline */
+.venda-produtos{overflow-x:auto;border-top:1px solid var(--border2);}
+.venda-produtos table{margin:0;}
+.venda-produtos th{background:var(--surface3);font-size:10.5px;}
+.venda-produtos td{font-size:13px;padding:9px 10px;}
 .venda-ref{font-weight:600;color:var(--text);}
 .ajuste-pos{color:var(--green);font-weight:700;}
 .ajuste-neg{color:var(--red);font-weight:700;}
-.fin-row{display:flex;justify-content:space-between;padding:9px 16px;border-bottom:1px solid var(--border2);font-size:13px;}
-.fin-row:last-child{border-bottom:none;}
-.fin-label{color:var(--text3);font-weight:600;}
-.fin-val{font-weight:700;color:var(--text);}
-.os-item{padding:12px 16px;border-bottom:1px solid var(--border2);font-size:13px;}
-.os-item:last-child{border-bottom:none;}
-.os-num{font-weight:800;color:var(--blue-lt);margin-right:8px;}
+/* Carrossel */
+.carrossel-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;}
+.carrossel-info{font-size:12.5px;font-weight:600;color:var(--text3);}
+.carrossel-btns{display:flex;gap:8px;}
+.carrossel-btn{background:var(--surface2);border:1px solid var(--border2);border-radius:8px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;color:var(--text2);transition:background .15s;}
+.carrossel-btn:hover{background:var(--surface3);}
+.carrossel-btn:disabled{opacity:.35;cursor:default;}
 </style>
 </head>
 <body>
@@ -124,12 +119,10 @@ tr:hover td{background:var(--surface2);}
     <div class="brand-sub">Ótica Cristal Santa Rosa</div>
   </div>
   <div class="period-controls">
-    <select id="modo-periodo" onchange="onModoChange()">
-      <option value="mes">Mês completo</option>
-      <option value="custom">Período personalizado</option>
-    </select>
-    <select id="sel-mes"></select>
-    <input type="date" id="data-inicio" style="display:none">
+    <select id="sel-ano" onchange="onAnoChange()"></select>
+    <select id="sel-mes" onchange="onMesChange()"></select>
+    <input type="date" id="data-inicio" style="display:none" onchange="onCustomChange()">
+    <span id="sep-ate" style="display:none;font-size:12px;color:var(--text3);font-weight:600;">até</span>
     <input type="date" id="data-fim" style="display:none">
     <button class="btn" onclick="carregar()">🔍 Buscar</button>
   </div>
@@ -156,10 +149,34 @@ tr:hover td{background:var(--surface2);}
     </div>
   </div>
 
+  <!-- ── Gráficos ─────────────────────────────────────────────── -->
+  <div class="grid-2" style="margin-bottom:24px;">
+    <div class="section" style="margin-bottom:0;">
+      <div class="section-title"><span class="bar"></span>Por Tipo de Produto</div>
+      <div class="chart-wrap small"><canvas id="chart-tipos"></canvas></div>
+    </div>
+    <div class="section" style="margin-bottom:0;">
+      <div class="section-title"><span class="bar"></span>Por Consultor</div>
+      <div class="chart-wrap small"><canvas id="chart-consultores"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section" style="margin-bottom:24px;">
+    <div class="section-title"><span class="bar"></span>Formas de Pagamento</div>
+    <div style="display:grid;grid-template-columns:220px 1fr;gap:24px;align-items:center;">
+      <div class="chart-wrap small" style="height:200px;"><canvas id="chart-pagamentos"></canvas></div>
+      <div id="pag-legenda" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+  </div>
+
   <div class="section">
-    <div class="section-title" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">
-      <div style="display:flex;align-items:center;gap:8px;"><span class="bar"></span>Vendas do Período</div>
-      <span id="vendas-count" style="font-size:12px;font-weight:600;color:var(--text3);"></span>
+    <div class="section-title"><span class="bar"></span>Vendas do Período</div>
+    <div class="carrossel-nav">
+      <span id="vendas-count" class="carrossel-info"></span>
+      <div class="carrossel-btns">
+        <button class="carrossel-btn" id="btn-prev" onclick="paginaVendas(-1)" disabled>‹</button>
+        <button class="carrossel-btn" id="btn-next" onclick="paginaVendas(1)"  disabled>›</button>
+      </div>
     </div>
     <div id="lista-vendas"></div>
   </div>
@@ -170,7 +187,6 @@ tr:hover td{background:var(--surface2);}
 
 <script>
 const API_CNPJ = '07542559000192';
-const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
 // De-para: grupo como vem da API SSótica -> grupo de exibição consolidado
 const TIPOS_NOMES = {
@@ -231,40 +247,86 @@ function showLoading(show){
   }
 }
 
-function initMesSelect(){
-  const sel = document.getElementById('sel-mes');
+const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+function preencherMeses(ano, mesSelIdx){
   const now = new Date();
+  const sel = document.getElementById('sel-mes');
   const opts = [];
-  for(let i=0;i<24;i++){
-    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
-    const y = d.getFullYear(), m = d.getMonth();
-    opts.push(`<option value="${y}-${m}">${MESES[m]} ${y}</option>`);
+  // Se ano atual, só até o mês atual; caso contrário todos os 12
+  const limite = ano === now.getFullYear() ? now.getMonth() : 11;
+  for(let m = limite; m >= 0; m--){
+    const sel_ = (mesSelIdx === m) ? ' selected' : '';
+    opts.push(`<option value="${ano}-${m}"${sel_}>${MESES[m]}</option>`);
   }
+  opts.push(`<option value="custom">📅 Selecionar período</option>`);
   sel.innerHTML = opts.join('');
 }
 
-function onModoChange(){
-  const modo = document.getElementById('modo-periodo').value;
-  document.getElementById('sel-mes').style.display = modo==='mes' ? '' : 'none';
-  document.getElementById('data-inicio').style.display = modo==='custom' ? '' : 'none';
-  document.getElementById('data-fim').style.display = modo==='custom' ? '' : 'none';
+function initMesSelect(){
+  const now = new Date();
+  const anoAtual = now.getFullYear();
+  const mesAtual = now.getMonth();
+
+  const selAno = document.getElementById('sel-ano');
+  const anos = [];
+  for(let y = anoAtual; y >= 2020; y--) anos.push(y);
+  selAno.innerHTML = anos.map(y => `<option value="${y}"${y===anoAtual?' selected':''}>${y}</option>`).join('');
+
+  preencherMeses(anoAtual, mesAtual);
+}
+
+function onAnoChange(){
+  const ano = +document.getElementById('sel-ano').value;
+  const now = new Date();
+  // Se voltou para o ano atual, seleciona o mês atual; senão dezembro
+  const mes = ano === now.getFullYear() ? now.getMonth() : 11;
+  preencherMeses(ano, mes);
+  esconderCustom();
+}
+
+function onMesChange(){
+  const val = document.getElementById('sel-mes').value;
+  if(val === 'custom'){
+    mostrarCustom();
+  } else {
+    esconderCustom();
+  }
+}
+
+function onCustomChange(){
+  // Ao preencher data início, pré-preenche fim com o mesmo valor se vazio
+  const ini = document.getElementById('data-inicio').value;
+  const fim = document.getElementById('data-fim');
+  if(ini && !fim.value) fim.value = ini;
+}
+
+function mostrarCustom(){
+  document.getElementById('data-inicio').style.display = '';
+  document.getElementById('data-fim').style.display = '';
+  document.getElementById('sep-ate').style.display = '';
+}
+
+function esconderCustom(){
+  document.getElementById('data-inicio').style.display = 'none';
+  document.getElementById('data-fim').style.display = 'none';
+  document.getElementById('sep-ate').style.display = 'none';
 }
 
 function getPeriodo(){
-  const modo = document.getElementById('modo-periodo').value;
-  if(modo==='mes'){
-    const [y,m] = document.getElementById('sel-mes').value.split('-').map(Number);
-    const lastDay = new Date(y, m+1, 0).getDate();
-    return {
-      start: `${y}-${String(m+1).padStart(2,'0')}-01`,
-      end: `${y}-${String(m+1).padStart(2,'0')}-${lastDay}`
-    };
-  } else {
+  const mes = document.getElementById('sel-mes').value;
+  if(mes === 'custom'){
     const start = document.getElementById('data-inicio').value;
-    const end = document.getElementById('data-fim').value;
+    const end   = document.getElementById('data-fim').value;
     if(!start || !end) return null;
     return {start, end};
   }
+  const [y, m] = mes.split('-').map(Number);
+  const lastDay = new Date(y, m+1, 0).getDate();
+  return {
+    start: `${y}-${String(m+1).padStart(2,'0')}-01`,
+    end:   `${y}-${String(m+1).padStart(2,'0')}-${lastDay}`
+  };
 }
 
 function splitInto30DayChunks(start, end){
@@ -298,75 +360,66 @@ async function fetchVendas(start, end){
 const SEMANAS_ORDEM = ['1ª Semana','2ª Semana','3ª Semana','4ª Semana','5ª Semana'];
 
 let _vcardIdx = 0;
+let _vendasLista = [];
+let _paginaAtual = 0;
+const POR_PAGINA = 4;
 
 function toggleCard(cid){
   const card = document.getElementById('card-'+cid);
   const jaAberto = card.classList.contains('aberto');
-  // Fecha todos
   document.querySelectorAll('.venda-card.aberto').forEach(c => c.classList.remove('aberto'));
-  // Abre este se estava fechado
   if(!jaAberto) card.classList.add('aberto');
 }
 
-function switchTab(event, cardId, aba){
-  event.stopPropagation(); // não propaga para o header
-  document.querySelectorAll(`#card-${cardId} .venda-tab-btn`).forEach(b => b.classList.remove('active'));
-  document.querySelectorAll(`#card-${cardId} .venda-tab-panel`).forEach(p => p.classList.remove('active'));
-  document.getElementById(`tab-btn-${cardId}-${aba}`).classList.add('active');
-  document.getElementById(`tab-${cardId}-${aba}`).classList.add('active');
+function paginaVendas(dir){
+  const totalPaginas = Math.ceil(_vendasLista.length / POR_PAGINA);
+  _paginaAtual = Math.max(0, Math.min(_paginaAtual + dir, totalPaginas - 1));
+  renderPagina();
 }
 
-function renderVendas(vendas){
-  const el    = document.getElementById('lista-vendas');
-  const count = document.getElementById('vendas-count');
+function renderPagina(){
+  const total = _vendasLista.length;
+  const totalPaginas = Math.ceil(total / POR_PAGINA);
+  const inicio = _paginaAtual * POR_PAGINA;
+  const fatia  = _vendasLista.slice(inicio, inicio + POR_PAGINA);
 
-  const lista = vendas
-    .filter(v => v.status === 'ATIVA')
-    .sort((a,b) => b.data.localeCompare(a.data) || (b.id||0)-(a.id||0));
+  document.getElementById('vendas-count').textContent =
+    `${inicio+1}–${Math.min(inicio+POR_PAGINA, total)} de ${total.toLocaleString('pt-BR')} vendas`;
+  document.getElementById('btn-prev').disabled = _paginaAtual === 0;
+  document.getElementById('btn-next').disabled = _paginaAtual >= totalPaginas - 1;
 
-  count.textContent = `${lista.length.toLocaleString('pt-BR')} vendas`;
-  if(!lista.length){ el.innerHTML='<div class="empty">Nenhuma venda encontrada.</div>'; return; }
-
-  el.innerHTML = lista.map(v => {
+  document.getElementById('lista-vendas').innerHTML = fatia.map(v => {
     const cid = 'vc'+(++_vcardIdx);
 
-    // ── Cabeçalho ───────────────────────────────────────────
-    const cliente   = tituloCase(v.cliente?.nome || 'Cliente não informado');
-    const consultor = tituloCase(v.funcionario?.nome || '—');
-    const numVenda  = v.numero || v.id || '—';
-    const dataFmt   = v.data ? new Date(v.data+'T00:00:00').toLocaleDateString('pt-BR') : '—';
-    const hora      = v.hora || v.horario || '';
-    const isNovo    = String(v.cliente?.tipo||v.cliente?.classificacao||'').toLowerCase().includes('novo');
+    const cliente    = tituloCase(v.cliente?.nome || 'Cliente não informado');
+    const consultor  = tituloCase(v.funcionario?.nome || '—');
+    const numVenda   = v.numero || v.id || '—';
+    const dataFmt    = v.data ? new Date(v.data+'T00:00:00').toLocaleDateString('pt-BR') : '—';
+    const hora       = v.hora || v.horario || '';
+    const isNovo     = String(v.cliente?.tipo||v.cliente?.classificacao||'').toLowerCase().includes('novo');
     const valorTotal = fmtMoney(
       +v.valor_total || +v.valor_total_liquido ||
       (v.itens||[]).reduce((s,i)=>s+(+i.valor_total_liquido||0),0)
     );
 
-    // Números de OS únicas
     const osNums = [...new Set(
       (v.ordens_servico||[]).map(o=>o.numero||o.id||'')
         .concat((v.itens||[]).map(i=>i.os_numero||i.ordem_servico?.numero||''))
         .filter(Boolean)
     )];
 
-    // ── Aba 1: Produtos/Serviços ─────────────────────────────
     const itensHtml = (v.itens||[]).map(item => {
-      const ref     = item.produto?.referencia || '—';
-      const desc    = tituloCase(item.produto?.descricao || item.produto?.nome || '');
-      const grupo   = nomeTipo(item.produto?.grupo);
-      const qty     = +item.quantidade || 0;
-      // Valor unitário bruto (antes de ajuste)
-      const valUnit = +item.valor_unitario || +item.preco_unitario || 0;
-      // Valor total líquido da linha (campo confirmado pela API)
+      const ref        = item.produto?.referencia || '—';
+      const desc       = tituloCase(item.produto?.descricao || item.produto?.nome || '');
+      const grupo      = nomeTipo(item.produto?.grupo);
+      const qty        = +item.quantidade || 0;
+      const valUnit    = +item.valor_unitario || +item.preco_unitario || 0;
       const valTotalLiq = +item.valor_total_liquido || 0;
-      // Valor unitário líquido calculado de forma segura
-      const valUnitLiq = qty > 0 ? valTotalLiq / qty : valTotalLiq;
-      // Ajuste = diferença entre unitário líquido e unitário bruto
-      const ajuste = valUnit > 0 ? valUnitLiq - valUnit : null;
-      const ajusteHtml = ajuste !== null && ajuste !== 0
+      const valUnitLiq  = qty > 0 ? valTotalLiq / qty : valTotalLiq;
+      const ajuste      = valUnit > 0 ? valUnitLiq - valUnit : null;
+      const ajusteHtml  = ajuste !== null && ajuste !== 0
         ? `<span class="${ajuste>0?'ajuste-pos':'ajuste-neg'}">${ajuste>0?'+':''}${ajuste.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>`
         : '<span style="color:var(--text3)">—</span>';
-
       return `<tr>
         <td>
           <div class="venda-ref">${ref}${desc?' — '+desc:''}</div>
@@ -379,41 +432,6 @@ function renderVendas(vendas){
         <td class="num" style="font-weight:700">${fmtMoney(valTotalLiq)}</td>
       </tr>`;
     }).join('');
-
-    // ── Aba 2: Informações Financeiras ───────────────────────
-    const vTotal     = +v.valor_total || +v.valor_total_liquido || 0;
-    const vDesconto  = +v.valor_desconto || +v.desconto || 0;
-    const vEntrada   = +v.valor_entrada  || +v.entrada  || 0;
-    const vSaldo     = +v.saldo || +v.valor_restante || (vTotal - vEntrada) || 0;
-    const pagamentos = v.pagamentos || v.formas_pagamento || [];
-    const pgHtml = pagamentos.length
-      ? pagamentos.map(p=>`<div class="fin-row">
-          <span class="fin-label">${tituloCase(p.forma||p.tipo||p.descricao||'Pagamento')}</span>
-          <span class="fin-val">${fmtMoney(+p.valor||0)}</span>
-        </div>`).join('')
-      : '';
-
-    const finHtml = `
-      <div class="fin-row"><span class="fin-label">Valor Total</span><span class="fin-val">${fmtMoney(vTotal)}</span></div>
-      ${vDesconto ? `<div class="fin-row"><span class="fin-label">Desconto</span><span class="fin-val" style="color:var(--red)">- ${fmtMoney(vDesconto)}</span></div>` : ''}
-      ${vEntrada  ? `<div class="fin-row"><span class="fin-label">Entrada / Pago</span><span class="fin-val" style="color:var(--green)">${fmtMoney(vEntrada)}</span></div>` : ''}
-      ${vSaldo    ? `<div class="fin-row"><span class="fin-label">Saldo em Aberto</span><span class="fin-val" style="color:var(--accent)">${fmtMoney(vSaldo)}</span></div>` : ''}
-      ${pgHtml}
-      ${!vDesconto&&!vEntrada&&!vSaldo&&!pgHtml ? '<div style="padding:16px;color:var(--text3);font-size:13px;">Informações financeiras não disponíveis neste período.</div>' : ''}
-    `;
-
-    // ── Aba 3: Ordens de Serviço ─────────────────────────────
-    const osList = v.ordens_servico || [];
-    const osHtml = osList.length
-      ? osList.map(o=>`<div class="os-item">
-          <span class="os-num">OS #${o.numero||o.id||'—'}</span>
-          <span style="color:var(--text2);font-weight:600;">${tituloCase(o.tipo||o.descricao||'')}</span>
-          ${o.status ? `<span style="font-size:11px;color:var(--text3);margin-left:8px;">${o.status}</span>` : ''}
-          ${o.data_entrega ? `<span style="font-size:11px;color:var(--text3);margin-left:8px;">Entrega: ${new Date(o.data_entrega+'T00:00:00').toLocaleDateString('pt-BR')}</span>` : ''}
-        </div>`).join('')
-      : osNums.length
-        ? osNums.map(n=>`<div class="os-item"><span class="os-num">OS #${n}</span><span style="color:var(--text3);font-size:12px;">Detalhes disponíveis ao consultar a OS diretamente no sistema.</span></div>`).join('')
-        : '<div style="padding:16px;color:var(--text3);font-size:13px;">Nenhuma Ordem de Serviço vinculada a esta venda.</div>';
 
     return `<div class="venda-card" id="card-${cid}">
       <div class="venda-header" onclick="toggleCard('${cid}')">
@@ -445,12 +463,7 @@ function renderVendas(vendas){
         <span class="venda-chevron">▼</span>
       </div>
       <div class="venda-body">
-        <div class="venda-tabs">
-          <button id="tab-btn-${cid}-prod" class="venda-tab-btn active" onclick="switchTab(event,'${cid}','prod')">Produtos / Serviços</button>
-          <button id="tab-btn-${cid}-fin"  class="venda-tab-btn"        onclick="switchTab(event,'${cid}','fin')">Informações Financeiras</button>
-          <button id="tab-btn-${cid}-os"   class="venda-tab-btn"        onclick="switchTab(event,'${cid}','os')">Ordens de Serviço</button>
-        </div>
-        <div id="tab-${cid}-prod" class="venda-tab-panel active">
+        <div class="venda-produtos">
           <table>
             <thead><tr>
               <th>Ref. — Produto</th>
@@ -463,11 +476,26 @@ function renderVendas(vendas){
             <tbody>${itensHtml}</tbody>
           </table>
         </div>
-        <div id="tab-${cid}-fin" class="venda-tab-panel">${finHtml}</div>
-        <div id="tab-${cid}-os"  class="venda-tab-panel">${osHtml}</div>
       </div>
     </div>`;
   }).join('');
+}
+
+function renderVendas(vendas){
+  _paginaAtual = 0;
+  _vcardIdx = 0;
+  _vendasLista = vendas
+    .filter(v => v.status === 'ATIVA')
+    .sort((a,b) => b.data.localeCompare(a.data) || (b.id||0)-(a.id||0));
+
+  if(!_vendasLista.length){
+    document.getElementById('lista-vendas').innerHTML = '<div class="empty">Nenhuma venda encontrada.</div>';
+    document.getElementById('vendas-count').textContent = '0 vendas';
+    document.getElementById('btn-prev').disabled = true;
+    document.getElementById('btn-next').disabled = true;
+    return;
+  }
+  renderPagina();
 }
 
 function dayToSem(dateStr){
@@ -550,6 +578,111 @@ function agregarConsultorPorSemana(rows){
   return {consultores, semanas, pivot};
 }
 
+function mkChart(id, type, labels, data, opts={}){
+  if(charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id).getContext('2d');
+  charts[id] = new Chart(ctx, {
+    type,
+    data: {
+      labels,
+      datasets:[{
+        data,
+        backgroundColor: CHART_COLORS,
+        borderColor: type==='doughnut' ? '#fff' : CHART_COLORS,
+        borderWidth: type==='doughnut' ? 2 : 0,
+        borderRadius: type==='bar' ? 5 : 0,
+        ...opts.dataset
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{ display: type==='doughnut', position:'right',
+          labels:{ boxWidth:12, font:{size:11}, color:'#555' }
+        },
+        tooltip:{
+          callbacks:{
+            label: ctx => {
+              const val = ctx.parsed.y ?? ctx.parsed;
+              return ' R$ ' + (typeof val==='number' ? val : ctx.raw).toLocaleString('pt-BR',{minimumFractionDigits:2});
+            }
+          }
+        }
+      },
+      scales: type==='bar' ? {
+        x:{ grid:{display:false}, ticks:{font:{size:11}, color:'#666'} },
+        y:{ grid:{color:'#f0f0f0'}, ticks:{
+          font:{size:11}, color:'#666',
+          callback: v => 'R$ '+v.toLocaleString('pt-BR',{notation:'compact'})
+        }}
+      } : undefined,
+      ...opts.chart
+    }
+  });
+}
+
+function agregarPagamentos(vendas){
+  const map = {};
+  for(const v of vendas){
+    if(v.status !== 'ATIVA') continue;
+    const pags = v.pagamentos || v.formas_pagamento || [];
+    for(const p of pags){
+      const forma = tituloCase(p.forma || p.tipo || p.descricao || 'Outros');
+      const val   = +p.valor || 0;
+      if(!map[forma]) map[forma] = {qty:0, val:0};
+      map[forma].qty++;
+      map[forma].val += val;
+    }
+  }
+  return map;
+}
+
+function renderCharts(rows, vendas){
+  // 1) Por tipo de produto (doughnut)
+  const porTipo = agregarPor(rows, 'tipo');
+  const tiposSorted = Object.entries(porTipo).sort((a,b)=>b[1].val-a[1].val);
+  mkChart('chart-tipos', 'doughnut',
+    tiposSorted.map(([k])=>k),
+    tiposSorted.map(([,v])=>+v.val.toFixed(2))
+  );
+
+  // 2) Por consultor (barras horizontais)
+  const porConsultor = agregarPor(rows, 'consultor');
+  const consSort = Object.entries(porConsultor).sort((a,b)=>b[1].val-a[1].val).slice(0,8);
+  mkChart('chart-consultores', 'bar',
+    consSort.map(([k])=>k),
+    consSort.map(([,v])=>+v.val.toFixed(2)),
+    { chart:{ indexAxis:'y', plugins:{legend:{display:false}} } }
+  );
+
+  // 3) Formas de pagamento
+  const pagMap = agregarPagamentos(vendas);
+  const pagSort = Object.entries(pagMap).sort((a,b)=>b[1].val-a[1].val);
+  const totalPag = pagSort.reduce((s,[,v])=>s+v.val,0);
+
+  mkChart('chart-pagamentos', 'doughnut',
+    pagSort.map(([k])=>k),
+    pagSort.map(([,v])=>+v.val.toFixed(2)),
+    { chart:{ plugins:{legend:{display:false}} } }
+  );
+
+  // Legenda manual de pagamentos com %
+  const legEl = document.getElementById('pag-legenda');
+  if(pagSort.length){
+    legEl.innerHTML = pagSort.map(([forma, d], i) => {
+      const pct = totalPag ? (d.val/totalPag*100).toFixed(1) : '0.0';
+      return `<div style="display:flex;align-items:center;gap:10px;">
+        <span style="width:12px;height:12px;border-radius:3px;background:${CHART_COLORS[i%CHART_COLORS.length]};flex-shrink:0;"></span>
+        <span style="font-size:13px;font-weight:600;color:var(--text);flex:1;">${forma}</span>
+        <span style="font-size:12px;color:var(--text3);margin-left:auto;">${pct}%</span>
+        <span style="font-size:13px;font-weight:700;color:var(--text);min-width:90px;text-align:right;">${fmtMoney(d.val)}</span>
+      </div>`;
+    }).join('');
+  } else {
+    legEl.innerHTML = '<span style="font-size:13px;color:var(--text3);">Dados de pagamento não disponíveis para o período.</span>';
+  }
+}
+
 function limparTudo(){
   document.getElementById('kpi-qty').textContent = '0';
   document.getElementById('kpi-ticket').textContent = fmtMoney(0);
@@ -588,6 +721,7 @@ async function carregar(){
     document.getElementById('kpi-ticket').textContent = fmtMoney(ticketMedio);
 
     renderVendas(vendas);
+    renderCharts(rows, vendas);
 
     showLoading(false);
     showStatus(`✅ ${nVendas.toLocaleString('pt-BR')} vendas carregadas — ${periodo.start} a ${periodo.end}`, false, 5000);
