@@ -150,6 +150,17 @@ tr:hover td{background:var(--surface2);}
     <div id="tabela-marca"></div>
   </div>
 
+  <div class="section">
+    <div class="section-title"><span class="bar"></span>Por Semana do Mês</div>
+    <div class="chart-wrap" style="height:220px;margin-bottom:18px;"><canvas id="chart-semana"></canvas></div>
+    <div id="tabela-semana"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><span class="bar"></span>Consultor × Semana</div>
+    <div id="tabela-consultor-semana"></div>
+  </div>
+
 </div>
 
 <div id="status"></div>
@@ -282,6 +293,17 @@ async function fetchVendas(start, end){
   return results.flat();
 }
 
+const SEMANAS_ORDEM = ['1ª Semana','2ª Semana','3ª Semana','4ª Semana','5ª Semana'];
+
+function dayToSem(dateStr){
+  const d = new Date(dateStr+'T00:00:00').getDate();
+  if(d <= 7)  return '1ª Semana';
+  if(d <= 14) return '2ª Semana';
+  if(d <= 21) return '3ª Semana';
+  if(d <= 28) return '4ª Semana';
+  return '5ª Semana';
+}
+
 // Processa vendas: limpa nomenclaturas e exclui tipos irrelevantes
 function processarVendas(vendas){
   const rows = [];
@@ -293,6 +315,7 @@ function processarVendas(vendas){
     nVendas++;
     const consultor = tituloCase(venda.funcionario?.nome || 'Sem Consultor');
     const data = venda.data;
+    const semana = dayToSem(data);
     for(const item of itens){
       const qty = +item.quantidade || 0;
       const val = +item.valor_total_liquido || 0;
@@ -301,7 +324,7 @@ function processarVendas(vendas){
         consultor,
         tipo: nomeTipo(item.produto?.grupo),
         marca: tituloCase(item.produto?.grife || 'Sem Marca'),
-        data,
+        data, semana,
         qty, val
       });
     }
@@ -320,6 +343,36 @@ function agregarPor(rows, chave){
   return Object.entries(map)
     .map(([nome,d]) => ({nome, qty:d.qty, val:d.val, ticket: d.qty ? d.val/d.qty : 0}))
     .sort((a,b) => b.val - a.val);
+}
+
+function agregarPorSemana(rows){
+  const map = {};
+  for(const r of rows){
+    if(!map[r.semana]) map[r.semana] = {qty:0, val:0};
+    map[r.semana].qty += r.qty;
+    map[r.semana].val += r.val;
+  }
+  return SEMANAS_ORDEM
+    .filter(s => map[s])
+    .map(s => ({nome:s, qty:map[s].qty, val:map[s].val, ticket: map[s].qty ? map[s].val/map[s].qty : 0}));
+}
+
+function agregarConsultorPorSemana(rows){
+  // Retorna { consultores: [...], semanas: [...], pivot: { consultor: { semana: val } } }
+  const pivot = {};
+  const semanasPresentes = new Set();
+  for(const r of rows){
+    if(!pivot[r.consultor]) pivot[r.consultor] = {};
+    pivot[r.consultor][r.semana] = (pivot[r.consultor][r.semana]||0) + r.val;
+    semanasPresentes.add(r.semana);
+  }
+  const semanas = SEMANAS_ORDEM.filter(s => semanasPresentes.has(s));
+  const consultores = Object.keys(pivot).sort((a,b)=>{
+    const totalA = semanas.reduce((s,sem)=>s+(pivot[a][sem]||0),0);
+    const totalB = semanas.reduce((s,sem)=>s+(pivot[b][sem]||0),0);
+    return totalB - totalA;
+  });
+  return {consultores, semanas, pivot};
 }
 
 function agregarPorData(rows){
@@ -447,6 +500,65 @@ function renderChartTipo(dados){
   });
 }
 
+function renderChartSemana(dados){
+  destruirChart('semana');
+  const ctx = document.getElementById('chart-semana');
+  charts.semana = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: dados.map(d => d.nome),
+      datasets: [{
+        label: 'Valor Vendido',
+        data: dados.map(d => d.val),
+        backgroundColor: CHART_COLORS,
+        borderRadius: 6,
+        maxBarThickness: 60
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend:{display:false}, tooltip:{ callbacks:{ label: c => fmtMoney(c.parsed.y) } } },
+      scales: {
+        y: { ticks:{ callback: v => 'R$ '+v.toLocaleString('pt-BR') }, grid:{ color:'#EDF0F5' } },
+        x: { grid:{ display:false } }
+      }
+    }
+  });
+}
+
+function renderTabelaConsultorSemana({consultores, semanas, pivot}){
+  const el = document.getElementById('tabela-consultor-semana');
+  if(!consultores.length){ el.innerHTML='<div class="empty">Nenhum dado.</div>'; return; }
+  const rows = consultores.map(c => {
+    const total = semanas.reduce((s,sem)=>s+(pivot[c][sem]||0),0);
+    const colunas = semanas.map(sem => {
+      const v = pivot[c][sem]||0;
+      return `<td class="num">${v ? fmtMoney(v) : '<span style="color:var(--text3)">—</span>'}</td>`;
+    }).join('');
+    return `<tr><td><strong>${c}</strong></td>${colunas}<td class="num" style="font-weight:700">${fmtMoney(total)}</td></tr>`;
+  });
+
+  // Linha de total geral
+  const totaisSemana = semanas.map(sem =>
+    consultores.reduce((s,c)=>s+(pivot[c][sem]||0),0)
+  );
+  const totalGeral = totaisSemana.reduce((s,v)=>s+v,0);
+  const linhaTotal = `<tr style="background:var(--surface2);font-weight:700">
+    <td>Total</td>
+    ${totaisSemana.map(v=>`<td class="num">${fmtMoney(v)}</td>`).join('')}
+    <td class="num">${fmtMoney(totalGeral)}</td>
+  </tr>`;
+
+  el.innerHTML = `<div style="overflow-x:auto"><table>
+    <thead><tr>
+      <th>Consultor</th>
+      ${semanas.map(s=>`<th class="num">${s}</th>`).join('')}
+      <th class="num">Total</th>
+    </tr></thead>
+    <tbody>${rows.join('')}${linhaTotal}</tbody>
+  </table></div>`;
+}
+
 function limparTudo(){
   document.getElementById('kpi-qty').textContent = '0';
   document.getElementById('kpi-ticket').textContent = fmtMoney(0);
@@ -455,7 +567,9 @@ function limparTudo(){
   renderTabela('tabela-consultor', [], 'Consultor');
   renderTabela('tabela-tipo', [], 'Tipo');
   renderTabela('tabela-marca', [], 'Marca');
-  destruirChart('evolucao'); destruirChart('consultor'); destruirChart('tipo');
+  renderTabela('tabela-semana', [], 'Semana');
+  document.getElementById('tabela-consultor-semana').innerHTML = '';
+  destruirChart('evolucao'); destruirChart('consultor'); destruirChart('tipo'); destruirChart('semana');
 }
 
 async function carregar(){
@@ -491,13 +605,19 @@ async function carregar(){
     const porMarca = agregarPor(rows, 'marca');
     const porData = agregarPorData(rows);
 
+    const porSemana = agregarPorSemana(rows);
+    const consultorSemana = agregarConsultorPorSemana(rows);
+
     renderTabela('tabela-consultor', porConsultor, 'Consultor');
     renderTabela('tabela-tipo', porTipo, 'Tipo de Produto', totalVal);
     renderTabela('tabela-marca', porMarca.slice(0,15), 'Marca');
+    renderTabela('tabela-semana', porSemana, 'Semana', totalVal);
+    renderTabelaConsultorSemana(consultorSemana);
 
     renderChartEvolucao(porData);
     renderChartConsultor(porConsultor);
     renderChartTipo(porTipo);
+    renderChartSemana(porSemana);
 
     showLoading(false);
     showStatus(`✅ ${nVendas.toLocaleString('pt-BR')} vendas carregadas — ${periodo.start} a ${periodo.end}`, false, 5000);
